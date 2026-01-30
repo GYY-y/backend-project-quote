@@ -60,6 +60,9 @@ async def get_today_quote():
             **quote,
             'is_today': is_today
         }
+    except HTTPException:
+        # 将业务类 HTTPException 原样抛出，避免被捕获为 500
+        raise
     except Exception as e:
         logger.error(f"获取今日金句失败: {e}")
         raise HTTPException(status_code=500, detail="获取今日金句失败")
@@ -82,6 +85,8 @@ async def get_history_quotes(
             quotes=quotes,
             pagination=PaginationInfo(**result['pagination'])
         )
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"获取历史金句失败: {e}")
         raise HTTPException(status_code=500, detail="获取历史金句失败")
@@ -106,6 +111,8 @@ async def search_quotes(
             pagination=PaginationInfo(**result['pagination']),
             query=q
         )
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"搜索金句失败: {e}")
         raise HTTPException(status_code=500, detail="搜索金句失败")
@@ -140,6 +147,8 @@ async def trigger_crawl(source: str):
             "message": f"{source}爬取完成",
             "quotes_added": count
         }
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"触发爬取失败: {e}")
         return {
