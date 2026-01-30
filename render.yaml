@@ -1,0 +1,31 @@
+services:
+  - type: web
+    name: quotes-api
+    env: python
+    plan: free
+    buildCommand: "pip install -r requirements.txt"
+    startCommand: "python main.py"
+    healthCheckPath: /api/health
+    autoDeploy: true
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11
+      - key: PORT
+        value: 8000
+      - key: HOST
+        value: 0.0.0.0
+    disk:
+      name: quotes-data
+      mountPath: /app/database
+      sizeGB: 1
+    cors:
+      allowedOrigins:
+        - https://your-frontend-domain.vercel.app
+        - http://localhost:3000
+      allowedMethods:
+        - GET
+        - POST
+        - OPTIONS
+      allowedHeaders:
+        - Content-Type
+        - Authorization
