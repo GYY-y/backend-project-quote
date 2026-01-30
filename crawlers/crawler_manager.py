@@ -1,6 +1,12 @@
 from .people_crawler import PeopleCrawler
-from .cctv_crawler import CCTVCrawler
 from .paper_crawler import PaperCrawler
+from .wechat_paper_crawler import WechatPaperCrawler
+from .healing_crawler import HealingCrawler
+from .daodu_crawler import DaoduCrawler
+from .motivation_crawler import MotivationCrawler
+from .juzikong_crawler import JuziKongCrawler
+from .yiyan_crawler import YiYanCrawler
+from .judou_crawler import JuDouCrawler
 from database.db_manager import DatabaseManager
 import logging
 from typing import List, Dict
@@ -14,8 +20,14 @@ class CrawlerManager:
         self.db_manager = DatabaseManager()
         self.crawlers = {
             '人民网': PeopleCrawler(),
-            '央视网': CCTVCrawler(),
-            '人民日报': PaperCrawler()
+            '人民日报': PaperCrawler(),
+            '人民日报微信': WechatPaperCrawler(),
+            '治愈系精选': HealingCrawler(),
+            '岛读': DaoduCrawler(),
+            'Motivation': MotivationCrawler(),
+            '句子控': JuziKongCrawler(),
+            '一言': YiYanCrawler(),
+            '句读': JuDouCrawler(),
         }
     
     def crawl_all_sources(self) -> Dict[str, int]:

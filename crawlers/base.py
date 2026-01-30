@@ -1,3 +1,4 @@
+import os
 import requests
 import time
 import random
@@ -17,6 +18,11 @@ class BaseCrawler(ABC):
         self.name = name
         self.session = requests.Session()
         self.setup_headers()
+        self.setup_proxy()
+        # 可通过环境变量调整延迟/超时，便于在受限网络环境下调试
+        self.min_delay = float(os.getenv("CRAWLER_MIN_DELAY", "0.8"))
+        self.max_delay = float(os.getenv("CRAWLER_MAX_DELAY", "2.0"))
+        self.request_timeout = int(os.getenv("CRAWLER_TIMEOUT", "10"))
         
     def setup_headers(self):
         """设置请求头"""
@@ -35,14 +41,26 @@ class BaseCrawler(ABC):
             'Upgrade-Insecure-Requests': '1',
         })
     
+    def setup_proxy(self):
+        """配置代理，支持通过环境变量设置"""
+        # 优先使用自定义环境变量，其次使用系统的 HTTP(S)_PROXY
+        http_proxy = os.getenv("CRAWLER_HTTP_PROXY") or os.getenv("HTTP_PROXY")
+        https_proxy = os.getenv("CRAWLER_HTTPS_PROXY") or os.getenv("HTTPS_PROXY")
+        if http_proxy or https_proxy:
+            self.session.proxies.update({
+                "http": http_proxy,
+                "https": https_proxy or http_proxy,
+            })
+            logger.info(f"{self.name} 使用代理: http={http_proxy}, https={https_proxy or http_proxy}")
+    
     def get_page(self, url: str, timeout: int = 10) -> Optional[BeautifulSoup]:
         """获取页面内容"""
         try:
             # 随机延迟，避免请求过快
-            delay = random.uniform(2, 5)
+            delay = random.uniform(self.min_delay, self.max_delay)
             time.sleep(delay)
             
-            response = self.session.get(url, timeout=timeout)
+            response = self.session.get(url, timeout=timeout or self.request_timeout)
             response.raise_for_status()
             
             # 检测编码
@@ -79,30 +97,8 @@ class BaseCrawler(ABC):
         pass
     
     def is_quote(self, text: str) -> bool:
-        """判断是否为励志金句"""
-        if not text or len(text) < 10:
+        """最小化过滤：只要有内容且长度合理即收录"""
+        if not text:
             return False
-        
-        # 排除包含以下关键词的文本
-        exclude_keywords = [
-            '广告', '推广', '链接', '点击', '下载', '购买', '价格',
-            '电话', '地址', '邮箱', '网站', 'http', 'www'
-        ]
-        
-        for keyword in exclude_keywords:
-            if keyword in text:
-                return False
-        
-        # 励志相关关键词
-        include_keywords = [
-            '奋斗', '坚持', '努力', '成功', '梦想', '希望', '勇气',
-            '信念', '励志', '人生', '成长', '进步', '挑战', '目标'
-        ]
-        
-        # 如果文本较长且包含励志相关词汇，更可能是金句
-        text_lower = text.lower()
-        has_inspirational = any(keyword in text_lower for keyword in include_keywords)
-        
-        # 简单启发式：长度适中、包含积极词汇
-        return (10 <= len(text) <= 200 and 
-                (has_inspirational or len(text) > 30))
+        text = text.strip()
+        return 6 <= len(text) <= 200
