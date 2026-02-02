@@ -15,6 +15,7 @@ crawler_manager = CrawlerManager()
 class QuoteResponse(BaseModel):
     id: int
     content: str
+    content_en: Optional[str] = None
     source: str
     original_url: Optional[str] = None
     author: Optional[str] = None
@@ -31,6 +32,7 @@ class QuotesListResponse(BaseModel):
     quotes: list[QuoteResponse]
     pagination: PaginationInfo
     query: Optional[str] = None
+    category: Optional[str] = None
 
 class TodayQuoteResponse(BaseModel):
     id: int
@@ -116,6 +118,29 @@ async def search_quotes(
     except Exception as e:
         logger.error(f"搜索金句失败: {e}")
         raise HTTPException(status_code=500, detail="搜索金句失败")
+
+@router.get("/category", response_model=QuotesListResponse)
+async def get_quotes_by_category(
+    category: str = Query(..., description="分类名称"),
+    page: int = Query(1, ge=1, description="页码"),
+    limit: int = Query(10, ge=1, le=100, description="每页数量")
+):
+    """按分类获取金句"""
+    try:
+        result = db_manager.get_quotes_by_category(category=category, page=page, limit=limit)
+
+        quotes = [QuoteResponse(**quote) for quote in result['quotes']]
+
+        return QuotesListResponse(
+            quotes=quotes,
+            pagination=PaginationInfo(**result['pagination']),
+            category=category
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"按分类获取金句失败: {e}")
+        raise HTTPException(status_code=500, detail="按分类获取金句失败")
 
 @router.get("/stats")
 async def get_statistics():

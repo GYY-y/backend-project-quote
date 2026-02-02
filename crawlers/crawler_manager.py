@@ -7,6 +7,7 @@ from .motivation_crawler import MotivationCrawler
 from .juzikong_crawler import JuziKongCrawler
 from .yiyan_crawler import YiYanCrawler
 from .judou_crawler import JuDouCrawler
+from .curated_crawler import CuratedCrawler
 from database.db_manager import DatabaseManager
 import logging
 from typing import List, Dict
@@ -28,6 +29,7 @@ class CrawlerManager:
             '句子控': JuziKongCrawler(),
             '一言': YiYanCrawler(),
             '句读': JuDouCrawler(),
+            '精选金句': CuratedCrawler(),
         }
     
     def crawl_all_sources(self) -> Dict[str, int]:

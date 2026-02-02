@@ -25,6 +25,8 @@ class DatabaseManager:
         # 如果数据库不存在，创建表
         if not os.path.exists(self.db_path):
             self._init_tables()
+        else:
+            self._ensure_additional_columns()
     
     def _init_tables(self):
         """初始化数据库表"""
@@ -36,6 +38,7 @@ class DatabaseManager:
                 CREATE TABLE quotes (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     content TEXT NOT NULL,
+                    content_en TEXT,
                     source VARCHAR(50) NOT NULL,
                     original_url TEXT,
                     author VARCHAR(100),
@@ -65,6 +68,20 @@ class DatabaseManager:
             
             conn.commit()
             logger.info(f"数据库初始化完成: {self.db_path}")
+
+    def _ensure_additional_columns(self):
+        """为已有数据库补充新增列"""
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                cursor.execute("PRAGMA table_info(quotes)")
+                cols = [row[1] for row in cursor.fetchall()]
+                if "content_en" not in cols:
+                    cursor.execute("ALTER TABLE quotes ADD COLUMN content_en TEXT")
+                    conn.commit()
+                    logger.info("已为 quotes 表添加 content_en 列（双语存储）")
+        except Exception as e:
+            logger.warning(f"检查/添加扩展列失败: {e}")
     
     def insert_quotes(self, quotes: List[Dict]) -> int:
         """插入金句数据"""
@@ -80,10 +97,11 @@ class DatabaseManager:
                 try:
                     cursor.execute('''
                         INSERT OR IGNORE INTO quotes 
-                        (content, source, original_url, author, category)
-                        VALUES (?, ?, ?, ?, ?)
+                        (content, content_en, source, original_url, author, category)
+                        VALUES (?, ?, ?, ?, ?, ?)
                     ''', (
                         quote.get('content', ''),
+                        quote.get('content_en', ''),
                         quote.get('source', ''),
                         quote.get('original_url', ''),
                         quote.get('author', ''),
@@ -213,6 +231,38 @@ class DatabaseManager:
                     'total_pages': total_pages
                 },
                 'query': query
+            }
+    
+    def get_quotes_by_category(self, category: str, page: int = 1, limit: int = 10) -> Dict:
+        """按分类获取金句（分页）"""
+        offset = (page - 1) * limit
+        
+        with sqlite3.connect(self.db_path) as conn:
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
+            
+            cursor.execute('SELECT COUNT(*) as total FROM quotes WHERE category = ?', (category,))
+            total = cursor.fetchone()['total']
+            
+            cursor.execute('''
+                SELECT * FROM quotes 
+                WHERE category = ?
+                ORDER BY created_at DESC 
+                LIMIT ? OFFSET ?
+            ''', (category, limit, offset))
+            
+            quotes = [dict(row) for row in cursor.fetchall()]
+            total_pages = (total + limit - 1) // limit
+            
+            return {
+                'quotes': quotes,
+                'pagination': {
+                    'page': page,
+                    'limit': limit,
+                    'total': total,
+                    'total_pages': total_pages
+                },
+                'category': category
             }
     
     def get_crawl_logs(self, source: str = None, limit: int = 10) -> List[Dict]:

@@ -2,10 +2,12 @@ import os
 import requests
 import time
 import random
+import re
 from bs4 import BeautifulSoup
 from typing import List, Dict, Optional
 from abc import ABC, abstractmethod
 import logging
+from .translator import QuoteTranslator
 
 # 配置日志
 logging.basicConfig(level=logging.INFO)
@@ -19,6 +21,7 @@ class BaseCrawler(ABC):
         self.session = requests.Session()
         self.setup_headers()
         self.setup_proxy()
+        self.translator = QuoteTranslator()
         # 可通过环境变量调整延迟/超时，便于在受限网络环境下调试
         self.min_delay = float(os.getenv("CRAWLER_MIN_DELAY", "0.8"))
         self.max_delay = float(os.getenv("CRAWLER_MAX_DELAY", "2.0"))
@@ -97,8 +100,46 @@ class BaseCrawler(ABC):
         pass
     
     def is_quote(self, text: str) -> bool:
-        """最小化过滤：只要有内容且长度合理即收录"""
+        """判定是否为金句：长度适中且包含一定比例中文/文字"""
         if not text:
             return False
         text = text.strip()
-        return 6 <= len(text) <= 200
+        length = len(text)
+        if length < 6 or length > 120:
+            return False
+
+        # 需要一定比例的中文或字母，避免整段符号/数字
+        letters = re.findall(r'[A-Za-z\u4e00-\u9fff]', text)
+        if not letters:
+            return False
+        ratio = len(letters) / length
+        return ratio >= 0.3
+
+    def normalize_quote_text(self, text: str, max_length: int = 100) -> Optional[str]:
+        """
+        清洗并裁剪金句文本：
+        - 去除空白和 HTML 实体
+        - 尝试按句号/感叹号/分号等截取前 1-2 句
+        - 控制长度，超长则截断
+        - 统一补全结尾句号
+        """
+        cleaned = self.clean_text(text)
+        if not cleaned:
+            return None
+
+        # 优先按句号/感叹号/问号/分号切分，取前两句
+        parts = [p.strip() for p in re.split(r'[。！？!?；;]', cleaned) if p.strip()]
+        if parts:
+            cleaned = "。".join(parts[:2])
+
+        # 再次限制长度，过长则截断到 max_length
+        if len(cleaned) > max_length:
+            cleaned = cleaned[:max_length].rstrip('，,。.!！？?；;')
+
+        if not self.is_quote(cleaned):
+            return None
+
+        if cleaned and cleaned[-1] not in "。！？!?":
+            cleaned += "。"
+
+        return cleaned

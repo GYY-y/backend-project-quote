@@ -137,20 +137,22 @@ class CCTVCrawler(BaseCrawler):
                         sentences = [s.strip() for s in re.split(r'[。！？!]', full_text) if s.strip()]
                         
                         for sent in sentences:
-                            if self.is_quote(sent):
-                                quote = {
-                                    'content': sent if sent.endswith(('。','！','!')) else sent + '。',
-                                    'source': '央视网',
-                                    'original_url': url,
-                                    'title': title,
-                                    'author': self._get_author(soup),
-                                    'category': self._get_category(soup)
-                                }
-                                quotes.append(quote)
-                                
-                                # 限制每篇文章最多获取3条金句
-                                if len(quotes) >= 3:
-                                    break
+                            normalized = self.normalize_quote_text(sent)
+                            if not normalized:
+                                continue
+                            quote = {
+                                'content': normalized,
+                                'source': '央视网',
+                                'original_url': url,
+                                'title': title,
+                                'author': self._get_author(soup),
+                                'category': self._get_category(soup)
+                            }
+                            quotes.append(quote)
+                            
+                            # 限制每篇文章最多获取3条金句
+                            if len(quotes) >= 3:
+                                break
                                 
                 except Exception as e:
                     logger.warning(f"选择器 {selector} 失败: {e}")
